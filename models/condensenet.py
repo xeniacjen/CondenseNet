@@ -65,6 +65,9 @@ class CondenseNet(nn.Module):
         if args.data in ['cifar10', 'cifar100']:
             self.init_stride = 1
             self.pool_size = 8
+        elif 'tiny-imagenet-200' in args.data:
+            self.init_stride = 1
+            self.pool_size = 8
         else:
             self.init_stride = 2
             self.pool_size = 7

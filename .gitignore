@@ -104,3 +104,4 @@ ENV/
 results/*
 
 .DS_Store
+.Trashes

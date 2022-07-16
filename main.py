@@ -45,8 +45,8 @@ parser.add_argument('--manual-seed', default=0, type=int, metavar='N',
 parser.add_argument('--gpu',
                     help='gpu available')
 
-parser.add_argument('--savedir', type=str, metavar='PATH', default='results/savedir',
-                    help='path to save result and checkpoint (default: results/savedir)')
+parser.add_argument('--savedir', type=str, metavar='PATH', default=None,
+                    help='path to save result and checkpoint (default: results/$MODEL_$DATA)')
 parser.add_argument('--resume', action='store_true',
                     help='use latest checkpoint if have any (default: none)')
 
@@ -66,7 +66,7 @@ parser.add_argument('--reduction', default=0.5, type=float, metavar='R',
                     help='transition reduction (default: 0.5)')
 parser.add_argument('--dropout-rate', default=0, type=float,
                     help='drop out (default: 0)')
-parser.add_argument('--group-lasso-lambda', default=0., type=float, metavar='LASSO',
+parser.add_argument('--group-lasso-lambda', default=1e-5, type=float, metavar='LASSO',
                     help='group lasso loss weight (default: 0)')
 
 parser.add_argument('--evaluate', action='store_true',
@@ -89,6 +89,17 @@ elif args.data == 'cifar100':
     args.num_classes = 100
 else:
     args.num_classes = 1000
+
+if args.savedir is None: 
+    tail = '%s_'%args.model
+    if args.data == 'cifar10':
+        tail += args.data 
+    elif args.data == 'cifar100':
+        tail += args.data 
+    else:
+        tail += os.path.basename(args.data)
+
+    args.savedir = os.path.join('results', tail) 
 
 warnings.filterwarnings("ignore")
 
@@ -115,6 +126,8 @@ def main():
     print(model)
     if args.data in ['cifar10', 'cifar100']:
         IMAGE_SIZE = 32
+    elif 'tiny-imagenet-200' in args.data:
+        IMAGE_SIZE = 56
     else:
         IMAGE_SIZE = 224
     n_flops, n_params = measure_model(model, IMAGE_SIZE, IMAGE_SIZE)
@@ -200,6 +213,23 @@ def main():
                                        transforms.ToTensor(),
                                        normalize,
                                    ]))
+    elif 'tiny-imagenet-200' in args.data:
+        traindir = os.path.join(args.data, 'training')
+        valdir = os.path.join(args.data, 'validation')
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                         std=[0.229, 0.224, 0.225])
+        train_set = datasets.ImageFolder(traindir, transforms.Compose([
+            transforms.RandomSizedCrop(56),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            normalize,
+        ]))
+
+        val_set = datasets.ImageFolder(valdir, transforms.Compose([
+            transforms.CenterCrop(56),
+            transforms.ToTensor(),
+            normalize,
+        ]))
     else:
         traindir = os.path.join(args.data, 'train')
         valdir = os.path.join(args.data, 'val')
@@ -231,6 +261,8 @@ def main():
 
     if args.evaluate:
         validate(val_loader, model, criterion)
+        n_flops, n_params = measure_model(model, IMAGE_SIZE, IMAGE_SIZE)
+        print('FLOPs: %.2fM, Params: %.2fM' % (n_flops / 1e6, n_params / 1e6))
         return
 
     for epoch in range(args.start_epoch, args.epochs):
@@ -387,7 +419,7 @@ def load_checkpoint(args):
     latest_filename = os.path.join(model_dir, 'latest.txt')
     if os.path.exists(latest_filename):
         with open(latest_filename, 'r') as fin:
-            model_filename = fin.readlines()[0]
+            model_filename = fin.readlines()[0].strip()
     else:
         return None
     print("=> loading checkpoint '{}'".format(model_filename))
@@ -470,7 +502,7 @@ def accuracy(output, target, topk=(1,)):
 
     res = []
     for k in topk:
-        correct_k = correct[:k].view(-1).float().sum(0)
+        correct_k = correct[:k].reshape(-1).float().sum(0)
         res.append(correct_k.mul_(100.0 / batch_size))
     return res
 
