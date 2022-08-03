@@ -91,13 +91,14 @@ else:
     args.num_classes = 1000
 
 if args.savedir is None: 
-    tail = '%s_'%args.model
+    tail = '%s%d_'%(args.model, sum(args.stages)*2+2)
     if args.data == 'cifar10':
         tail += args.data 
     elif args.data == 'cifar100':
         tail += args.data 
     else:
         tail += os.path.basename(args.data)
+    tail += '_epochs=%d'%args.epochs
 
     args.savedir = os.path.join('results', tail) 
 
