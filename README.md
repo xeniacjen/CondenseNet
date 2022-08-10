@@ -137,5 +137,6 @@ For detailed options, please `python main.py --help`
 chingyuan.chen@duke.edu 
 
 Or you can contact the original authors: 
+
 liushichen95@gmail.com  
 gh349@cornell.com
