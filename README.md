@@ -1,10 +1,10 @@
 # CondenseNets
 
-This repository contains the code (in PyTorch) for "[CondenseNet: An Efficient DenseNet using Learned Group Convolutions](https://arxiv.org/abs/1711.09224)" paper by [Gao Huang](http://www.cs.cornell.edu/~gaohuang/)\*, [Shichen Liu](https://shichenliu.github.io)\*, [Laurens van der Maaten](https://lvdmaaten.github.io) and [Kilian Weinberger](https://www.cs.cornell.edu/%7Ekilian/) (* Authors contributed equally).
+This forked repository contains the code (in PyTorch) for "[CondenseNet: An Efficient DenseNet using Learned Group Convolutions](https://arxiv.org/abs/1711.09224)" paper by [Gao Huang](http://www.cs.cornell.edu/~gaohuang/)\*, [Shichen Liu](https://shichenliu.github.io)\*, [Laurens van der Maaten](https://lvdmaaten.github.io) and [Kilian Weinberger](https://www.cs.cornell.edu/%7Ekilian/) (* Authors contributed equally).
 
 ### Citation
 
-If you find our project useful in your research, please consider citing:
+If you find this project useful in your research, please consider citing:
 
 ```
 @inproceedings{huang2018condensenet,
@@ -41,7 +41,7 @@ Figure 2: CondenseNets with Fully Dense Connectivity and Increasing Growth Rate.
 ### Dependencies
 
 - [Python3](https://www.python.org/downloads/)
-- [PyTorch(1.1.0)](http://pytorch.org)
+- [PyTorch(1.10.1)](http://pytorch.org)
 - [ImageNet](https://www.image-net.org/challenges/LSVRC/2012/)
 
 ### Train
@@ -134,8 +134,8 @@ For detailed options, please `python main.py --help`
 | CondenseNet-74 (C=G=8) | 274M | 29.0 | 0.99 |
 
 ## Contact
+chingyuan.chen@duke.edu 
+
+Or you can contact the original authors: 
 liushichen95@gmail.com  
 gh349@cornell.com
-
-We are working on the implementation on other frameworks.  
-Any discussions or concerns are welcomed!
