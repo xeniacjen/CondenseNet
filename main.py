@@ -34,6 +34,8 @@ parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                     help='momentum (default: 0.9)')
 parser.add_argument('--weight-decay', '--wd', default=1e-4, type=float,
                     metavar='W', help='weight decay (default: 1e-4)')
+parser.add_argument('--rho', '-r', default=None, type=float, 
+                    metavar='R', help='rho hyperparam. for SAM optimizer (default: 0.0)')
 parser.add_argument('--print-freq', '-p', default=10, type=int,
                     metavar='N', help='print frequency (default: 10)')
 parser.add_argument('--pretrained', dest='pretrained', action='store_true',
@@ -100,6 +102,10 @@ if args.savedir is None:
         tail += args.data 
     else:
         tail += os.path.basename(args.data)
+
+    if args.rho is not None: 
+        tail += '_asam=%.2f'%args.rho 
+
     tail += '_epochs=%d'%args.epochs
 
     args.savedir = os.path.join('results', tail) 
@@ -114,6 +120,9 @@ import torch.optim
 import torch.utils.data
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
+
+from sam import SAM 
+from bypass_bn import enable_running_stats, disable_running_stats
 
 torch.manual_seed(args.manual_seed)
 torch.cuda.manual_seed_all(args.manual_seed)
@@ -151,10 +160,19 @@ def main():
 
     ### Define loss function (criterion) and optimizer
     criterion = nn.CrossEntropyLoss().cuda()
-    optimizer = torch.optim.SGD(model.parameters(), args.lr,
-                                momentum=args.momentum,
-                                weight_decay=args.weight_decay,
-                                nesterov=True)
+    if args.rho is None: 
+        optimizer = torch.optim.SGD(model.parameters(), args.lr,
+                                    momentum=args.momentum,
+                                    weight_decay=args.weight_decay,
+                                    nesterov=True)
+    else: 
+        base_optimizer = torch.optim.SGD 
+        optimizer = SAM(model.parameters(), base_optimizer, 
+                        args.rho, adaptive=True, # TODO 
+                        lr=args.lr,
+                        momentum=args.momentum,
+                        weight_decay=args.weight_decay,
+                        nesterov=True)
 
     ### Optionally resume from a checkpoint
     if args.resume:
@@ -322,7 +340,8 @@ def train(train_loader, model, criterion, optimizer, epoch):
             (args.epochs * len(train_loader))
         args.progress = progress
         ### Adjust learning rate
-        lr = adjust_learning_rate(optimizer, epoch, args, batch=i,
+        lr = adjust_learning_rate(optimizer if args.rho is None else optimizer.base_optimizer, 
+                                  epoch, args, batch=i,
                                   nBatch=len(train_loader), method=args.lr_type)
         if running_lr is None:
             running_lr = lr
@@ -335,6 +354,8 @@ def train(train_loader, model, criterion, optimizer, epoch):
         target_var = torch.autograd.Variable(target)
 
         ### Compute output
+        if args.rho is not None: 
+            enable_running_stats(model) 
         output = model(input_var, progress)
         loss = criterion(output, target_var)
 
@@ -352,9 +373,30 @@ def train(train_loader, model, criterion, optimizer, epoch):
         top5.update(prec5.item(), input.size(0))
 
         ### Compute gradient and do SGD step
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+        if args.rho is None: 
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+        ### Compute gradient and do SAM step
+        else: 
+            # first backward pass 
+            # with model.no_sync(): 
+            loss.backward()
+            optimizer.first_step(zero_grad=True) 
+
+            # second forward-backward pass 
+            disable_running_stats(model) 
+            output = model(input_var, progress)
+            loss = criterion(output, target_var)
+
+            if args.group_lasso_lambda > 0: # TODO: loss_func 
+                lasso_loss = 0
+                for m in learned_module_list:
+                    lasso_loss = lasso_loss + m.lasso_loss
+                loss = loss + args.group_lasso_lambda * lasso_loss
+
+            loss.backward() 
+            optimizer.second_step(zero_grad=True)
 
         ### Measure elapsed time
         batch_time.update(time.time() - end)
