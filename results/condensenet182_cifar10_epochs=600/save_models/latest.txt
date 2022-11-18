@@ -1,0 +1,1 @@
+results/condensenet182_cifar10_epochs=600/save_models/checkpoint_599.pth.tar

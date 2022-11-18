@@ -101,7 +101,8 @@ ENV/
 .mypy_cache/
 
 # result files
-results/*
+# results/*
+*tar
 
 .DS_Store
 .Trashes
