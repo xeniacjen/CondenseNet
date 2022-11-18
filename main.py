@@ -10,6 +10,7 @@ import time
 import math
 import warnings
 import models
+# from layers import CondensingLinear
 from utils import convert_model, measure_model
 
 parser = argparse.ArgumentParser(description='PyTorch Condensed Convolutional Networks')
@@ -38,8 +39,8 @@ parser.add_argument('--rho', '-r', default=None, type=float,
                     metavar='R', help='rho hyperparam. for SAM optimizer (default: 0.0)')
 parser.add_argument('--print-freq', '-p', default=10, type=int,
                     metavar='N', help='print frequency (default: 10)')
-parser.add_argument('--pretrained', dest='pretrained', action='store_true',
-                    help='use pre-trained model (default: false)')
+parser.add_argument('--pretrained', dest='pretrained', default=None, type=str, metavar='PATH',  
+                    help='use pre-trained model (default: none)')
 parser.add_argument('--no-save-model', dest='no_save_model', action='store_true',
                     help='only save best model (default: false)')
 parser.add_argument('--manual-seed', default=0, type=int, metavar='N',
@@ -79,6 +80,8 @@ parser.add_argument('--evaluate-from', default=None, type=str, metavar='PATH',
                     help='path to saved checkpoint (default: none)')
 
 args = parser.parse_args()
+if args.pretrained is not None: assert args.model=='condensenet_converted'
+
 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 args.stages = list(map(int, args.stages.split('-')))
 args.growth = list(map(int, args.growth.split('-')))
@@ -96,12 +99,20 @@ else:
 
 if args.savedir is None: 
     tail = '%s%d_'%(args.model, sum(args.stages)*2+2)
+    if args.group_1x1!=4: 
+        assert args.group_1x1==args.group_3x3 
+        assert args.group_1x1==args.condense_factor 
+        tail += 'C=G=%d_'%args.group_1x1 
+
     if args.data == 'cifar10':
         tail += args.data 
     elif args.data == 'cifar100':
         tail += args.data 
     else:
         tail += os.path.basename(args.data)
+
+    if args.pretrained is not None: 
+        tail += '_pretrained'
 
     if args.rho is not None: 
         tail += '_asam=%.2f'%args.rho 
@@ -157,6 +168,15 @@ def main():
         model.cuda()
     else:
         model = torch.nn.DataParallel(model).cuda()
+
+    if args.pretrained is not None: 
+        print("=> loading pretrained model '{}'".format(args.pretrained))
+        state_dict = torch.load(args.pretrained)['state_dict']
+        # model.load_state_dict(state_dict)
+        for name, param in state_dict.items(): 
+            if 'classifier.linear' in name: continue  
+            model.state_dict()[name].copy_(param)
+        print("=> loaded pretrained model '{}'".format(args.pretrained))
 
     ### Define loss function (criterion) and optimizer
     criterion = nn.CrossEntropyLoss().cuda()
